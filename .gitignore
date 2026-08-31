@@ -1,0 +1,33 @@
+# 运行时生成 / 用户数据
+config.json
+data/
+BiliLiveMonitor/
+gh_token.txt
+
+# 构建产物
+build/
+dist/
+release/
+installer/
+*.exe
+*.zip
+*.spec
+*.pkg
+
+# 依赖（首次运行 _fetch_deps.py 生成）
+libs/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 临时文件
+*.log
+.tmp/
+.tmp2/
+.exetmp/
+.pyitmp/
+_smoke*.py
+_capture*.py
