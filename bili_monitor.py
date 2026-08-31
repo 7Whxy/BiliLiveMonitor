@@ -65,6 +65,7 @@ DEFAULT_CONFIG = {
         'serverChan': {'enabled': False, 'sendKey': ''},
         'pushPlus': {'enabled': False, 'token': ''},
         'wxPusher': {'enabled': False, 'appToken': '', 'uids': []},
+        'bark': {'enabled': False, 'server': 'https://api.day.app', 'deviceKey': ''},
         'phoneCall': {'enabled': False, 'provider': 'twilio', 'accountSid': '', 'authToken': '', 'from': '', 'to': ''},
     },
 }
@@ -258,6 +259,88 @@ def push_wechat(cfg, title, body, log):
             log('WxPusher推送失败: %s' % e)
 
 
+def _bark_safe_error(err, device_key, endpoint):
+    msg = str(err)
+    quoted = urllib.parse.quote(device_key or '', safe='')
+    for token in (device_key, quoted, endpoint):
+        if token:
+            msg = msg.replace(token, '')
+    msg = ' '.join(msg.split())
+    return msg or '请求失败'
+
+
+def _bark_is_ipv4(host):
+    parts = (host or '').split('.')
+    if len(parts) != 4:
+        return False
+    try:
+        return all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
+    except Exception:
+        return False
+
+
+def _bark_normalize_server(raw):
+    server = (raw or '').strip().rstrip('/')
+    if not server:
+        return 'https://api.day.app'
+    parsed = urllib.parse.urlparse(server)
+    if not parsed.scheme:
+        host = server.split('/')[0].split(':')[0]
+        server = ('http://' if _bark_is_ipv4(host) else 'https://') + server
+        parsed = urllib.parse.urlparse(server)
+    if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+        return None
+    return '%s://%s%s' % (parsed.scheme, parsed.netloc, parsed.path.rstrip('/'))
+
+
+def push_bark(cfg, title, body, live_url, log):
+    bark = (cfg.get('notify') or {}).get('bark') or {}
+    if not bark.get('enabled'):
+        return
+    device_key = (bark.get('deviceKey') or '').strip()
+    if not device_key:
+        log('Bark 推送：Device Key 未填写，已跳过')
+        return
+    server = _bark_normalize_server(bark.get('server') or 'https://api.day.app')
+    if not server:
+        log('Bark 推送：Server URL 无效，已跳过')
+        return
+    encoded_key = urllib.parse.quote(device_key, safe='')
+    payload = {
+        'title': title,
+        'body': body,
+        'group': 'BiliLiveMonitor',
+    }
+    if live_url:
+        payload['url'] = live_url
+    data = urllib.parse.urlencode(payload).encode('utf-8')
+    headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+
+    def send(target_server):
+        endpoint = '%s/%s' % (target_server, encoded_key)
+        _post(endpoint, data, headers)
+        return endpoint
+
+    endpoint = '%s/%s' % (server, encoded_key)
+    try:
+        send(server)
+        log('Bark 推送成功')
+        return
+    except Exception as e:
+        parsed = urllib.parse.urlparse(server)
+        if parsed.scheme != 'https' or 'WRONG_VERSION_NUMBER' not in str(e).upper():
+            log('Bark 推送失败: %s' % _bark_safe_error(e, device_key, endpoint))
+            return
+        http_server = 'http://%s%s' % (parsed.netloc, parsed.path.rstrip('/'))
+        http_endpoint = '%s/%s' % (http_server, encoded_key)
+        try:
+            send(http_server)
+            log('Bark 推送成功（已自动改用 http）')
+        except Exception as e2:
+            log('Bark 推送失败: %s' % _bark_safe_error(e2, device_key, http_endpoint))
+
+
+
 def phone_call(cfg, text, log):
     pc = cfg.get('notify', {}).get('phoneCall', {})
     if not pc.get('enabled'):
@@ -280,10 +363,16 @@ def phone_call(cfg, text, log):
 def fire_notify(cfg, view, label, log):
     display = view.get('displayName', '')
     title = '【开播提醒】%s' % display
-    body = '标题：%s\n分区：%s\n链接：%s' % (view.get('title') or '（无）', view.get('area_name') or '（未知）', view.get('live_url') or '（未知）')
+    live_title = view.get('title') or '（无）'
+    area = view.get('area_name') or '（未知）'
+    live_url = view.get('live_url') or ''
+    body = '标题：%s\n分区：%s\n链接：%s' % (live_title, area, live_url or '（未知）')
+    bark_body = '标题：%s\n分区：%s' % (live_title, area)
     play_sound(cfg)
     push_wechat(cfg, title, body, log)
+    push_bark(cfg, title, bark_body, live_url, log)
     phone_call(cfg, '您关注的 %s 开播了' % display, log)
+
 
 
 # ---------- 开机自启 ----------
@@ -638,10 +727,13 @@ class App:
         self.sc_enabled_var = tk.BooleanVar(); self.sc_key_var = tk.StringVar()
         self.pp_enabled_var = tk.BooleanVar(); self.pp_token_var = tk.StringVar()
         self.wx_enabled_var = tk.BooleanVar(); self.wx_token_var = tk.StringVar(); self.wx_uids_var = tk.StringVar()
+        self.bark_enabled_var = tk.BooleanVar()
+        self.bark_server_var = tk.StringVar()
+        self.bark_key_var = tk.StringVar()
         self.pc_enabled_var = tk.BooleanVar(); self.pc_sid_var = tk.StringVar(); self.pc_auth_var = tk.StringVar()
         self.pc_from_var = tk.StringVar(); self.pc_to_var = tk.StringVar()
 
-        ttk.Label(f, text='开播时本应用会弹出置顶提醒窗口；离开电脑请配置微信推送。').pack(anchor='w', pady=(0, 10))
+        ttk.Label(f, text='开播时本应用会弹出置顶提醒窗口；离开电脑可配置 Bark、微信推送或电话提醒。').pack(anchor='w', pady=(0, 10))
         ttk.Checkbutton(f, text='提示音', variable=self.sound_var).pack(anchor='w')
         row = ttk.Frame(f); row.pack(fill='x', pady=(0, 12))
         ttk.Label(row, text='自定义提示音(.wav)').pack(side='left')
@@ -662,6 +754,16 @@ class App:
         ttk.Entry(r, textvariable=self.wx_uids_var).pack(side='left', fill='x', expand=True, padx=8)
         ttk.Label(f, text='填写要接收提醒的 UID，多个用英文逗号分隔：微信关注该应用后，在 WxPusher 后台「用户管理」或微信端「我的信息」里查看 UID。',
                   foreground=HINT_FG, wraplength=760, justify='left').pack(anchor='w', pady=(2, 10))
+
+        ttk.Separator(f, orient='horizontal').pack(fill='x', pady=8)
+        ttk.Label(f, text='Bark 推送（iOS）', font=('Microsoft YaHei UI', 10, 'bold')).pack(anchor='w')
+        ttk.Checkbutton(f, text='启用 Bark 推送', variable=self.bark_enabled_var).pack(anchor='w', pady=(4, 4))
+        self._field_row(f, 'Server URL', self.bark_server_var,
+                        '默认 https://api.day.app。自建服务请填完整地址；没有 https 时要用 http://，例如 http://192.168.1.10:2222。')
+        self._field_row(f, 'Device Key', self.bark_key_var,
+                        '打开 Bark App，在首页复制推送地址中的 Device Key。')
+        ttk.Label(f, text='收到开播提醒后点击 Bark 通知，可以直接打开对应 B 站直播间。',
+                  foreground=HINT_FG, wraplength=760, justify='left').pack(anchor='w', pady=(0, 10))
 
         ttk.Separator(f, orient='horizontal').pack(fill='x', pady=8)
         ttk.Label(f, text='电话提醒（Twilio 付费，可选）', font=('Microsoft YaHei UI', 10, 'bold')).pack(anchor='w')
@@ -846,6 +948,10 @@ class App:
         self.wx_enabled_var.set(bool(n.get('wxPusher', {}).get('enabled')))
         self.wx_token_var.set(n.get('wxPusher', {}).get('appToken') or '')
         self.wx_uids_var.set(','.join(n.get('wxPusher', {}).get('uids') or []))
+        bark = n.get('bark', {})
+        self.bark_enabled_var.set(bool(bark.get('enabled')))
+        self.bark_server_var.set(bark.get('server') or 'https://api.day.app')
+        self.bark_key_var.set(bark.get('deviceKey') or '')
         pc = n.get('phoneCall', {})
         self.pc_enabled_var.set(bool(pc.get('enabled')))
         self.pc_sid_var.set(pc.get('accountSid') or '')
@@ -880,6 +986,10 @@ class App:
         n['wxPusher']['enabled'] = self.wx_enabled_var.get()
         n['wxPusher']['appToken'] = self.wx_token_var.get().strip()
         n['wxPusher']['uids'] = [x.strip() for x in self.wx_uids_var.get().split(',') if x.strip()]
+        bark = n.setdefault('bark', {})
+        bark['enabled'] = self.bark_enabled_var.get()
+        bark['server'] = self.bark_server_var.get().strip() or 'https://api.day.app'
+        bark['deviceKey'] = self.bark_key_var.get().strip()
         pc = n['phoneCall']
         pc['enabled'] = self.pc_enabled_var.get()
         pc['accountSid'] = self.pc_sid_var.get().strip()
