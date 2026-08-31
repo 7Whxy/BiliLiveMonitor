@@ -1,0 +1,24 @@
+{
+  "intervalSeconds": 60,
+  "notifyOnStartup": false,
+  "notifyOnRound": true,
+  "rooms": [
+    { "roomId": "123456", "name": "示例主播" }
+  ],
+  "schedule": {
+    "enabled": false,
+    "rules": [
+      { "days": [1, 2, 3, 4, 5, 6, 7], "start": "19:00", "end": "23:00" }
+    ]
+  },
+  "reminder": { "repeatCount": 1, "repeatIntervalSeconds": 300 },
+  "appearance": { "background": "", "blur": 10, "frost": 30 },
+  "notify": {
+    "sound": true,
+    "soundPath": "",
+    "serverChan": { "enabled": false, "sendKey": "" },
+    "pushPlus": { "enabled": false, "token": "" },
+    "wxPusher": { "enabled": false, "appToken": "", "uids": [] },
+    "phoneCall": { "enabled": false, "provider": "twilio", "accountSid": "", "authToken": "", "from": "", "to": "" }
+  }
+}
