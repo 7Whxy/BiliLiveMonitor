@@ -1,0 +1,74 @@
+# 构建 + SignPath 代码签名 + 发布 Release
+# 触发：手动（workflow_dispatch）或推送 v* 标签
+name: build-and-sign
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-sign:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pillow pystray pyinstaller
+
+      - name: Build executable
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name BiliLiveMonitor --collect-submodules pystray --hidden-import pystray._win32 --icon assets/app.ico bili_monitor.py
+
+      - name: Upload unsigned artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: bili-unsigned
+          path: dist/BiliLiveMonitor.exe
+
+      - name: Submit signing request (SignPath)
+        id: sign
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIG }}
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          output-artifact-directory: signed
+          wait-for-completion: true
+
+      - name: Build portable zip (signed)
+        shell: pwsh
+        run: |
+          Copy-Item config.example.json config.json -Force
+          Compress-Archive -Path signed/BiliLiveMonitor.exe, config.json -DestinationPath "BiliLiveMonitor-${{ github.ref_name }}.zip"
+
+      - name: Upload signed artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bili-signed
+          path: |
+            signed/BiliLiveMonitor.exe
+            BiliLiveMonitor-${{ github.ref_name }}.zip
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            signed/BiliLiveMonitor.exe
+            BiliLiveMonitor-${{ github.ref_name }}.zip
