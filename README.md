@@ -146,11 +146,26 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed --name BiliLiveMo
 
 ---
 
+## 🛡️ Windows 安全拦截说明（重要）
+
+本程序是**开源、未做代码签名**的 exe（代码签名证书需付费购买），因此从 GitHub 下载后 Windows 会提示「无法验证发布者」。按你的系统版本处理：
+
+- **Windows 10 / SmartScreen（蓝色提示框）**：点「更多信息」→「仍要运行」即可。
+- **Windows 11 智能应用控制（Smart App Control）**：会直接拦截且无「仍要运行」选项。若你信任本程序，可临时关闭：
+  1. 打开「Windows 安全中心」→「应用和浏览器控制」→「智能应用控制设置」。
+  2. 选择「关闭」。
+  > ⚠️ 该开关**一旦关闭无法再开启**（除非重置/重装系统），请自行权衡；这是 Windows 对"无签名新软件"的通用拦截，并非本程序有风险。
+- **解除单个文件锁定**（对 SmartScreen 有效）：右键 exe →「属性」→ 勾选「解除锁定」→ 确定。
+
+> 想彻底消除提示：需用代码签名证书签名（收费），或用 [SignPath](https://signpath.org) 为开源项目申请**免费签名**——本仓库已备好接入脚本与工作流，详见 [SIGNPATH.md](SIGNPATH.md)。本仓库源码完全公开，任何有疑虑的人都可以**从源码自行打包运行**，效果完全一致。
+
+---
+
 ## ❓ 常见问题
 
 - **关闭窗口后程序还在运行？** 这是设计如此——关闭窗口会收进系统托盘继续监控，右键托盘图标可退出。
 - **微信收不到推送？** 请确认勾选了对应渠道、密钥/uid 填写正确，并查看「日志」标签页的推送结果。
-- **杀毒软件误报？** 单文件 exe 由 PyInstaller 打包，偶发误报，添加信任即可（源码公开可自行打包）。
+- **被 Windows 拦截 / 误报？** 见上方「Windows 安全拦截说明」。单文件 exe 由 PyInstaller 打包且未签名，属正常现象；源码公开可自行打包。
 - **技术说明**：基于 B 站公开接口查询开播状态，接口若调整可能需小幅更新（已内置单房间接口兜底）。
 
 ---
@@ -172,3 +187,5 @@ libs\                  运行/打包依赖（首次运行 _fetch_deps.py 生成�
 ## 📄 许可证
 
 [MIT](LICENSE)
+
+代码签名：Free code signing provided by [SignPath.io](https://signpath.org), certificate by SignPath Foundation（详见 [SIGNPATH.md](SIGNPATH.md)）。
