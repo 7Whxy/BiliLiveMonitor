@@ -31,6 +31,8 @@ REPO_FILES = [
     'publish.ps1',
     'publish.py',
     'PUBLISH.md',
+    'SIGNPATH.md',
+    '.github/workflows/build-and-sign.yml',
     'assets/app.ico',
     'docs/images/1-rooms.png',
     'docs/images/2-schedule.png',
@@ -109,8 +111,8 @@ def main():
     if st not in (201, 422):
         sys.exit(1)
 
-    # 3. 上传源码与文档
-    ok = fail = 0
+    # 3. 上传源码与文档（已存在且内容一致则跳过）
+    ok = fail = skip = 0
     for f in REPO_FILES:
         if not os.path.exists(f):
             print('  跳过缺失：%s' % f)
@@ -118,36 +120,54 @@ def main():
         with open(f, 'rb') as fh:
             content = base64.b64encode(fh.read()).decode()
         path = f.replace('\\', '/')
-        st, r = api(token, 'PUT', '%s/repos/%s/%s/contents/%s' % (GITHUB_API, owner, repo, path),
-                    {'message': 'add ' + path, 'content': content})
+        url = '%s/repos/%s/%s/contents/%s' % (GITHUB_API, owner, repo, path)
+        st, r = api(token, 'GET', url)
+        if st == 200 and isinstance(r, dict) and r.get('sha') and (r.get('content') or '').replace('\n', '') == content:
+            skip += 1
+            print('  未变 %s' % path)
+            continue
+        payload = {'message': 'add ' + path, 'content': content}
+        if st == 200 and isinstance(r, dict) and r.get('sha'):
+            payload = {'message': 'update ' + path, 'content': content, 'sha': r['sha']}
+        st, r = api(token, 'PUT', url, payload)
         if st in (200, 201):
             ok += 1
             print('  上传 %s' % path)
         else:
             fail += 1
             print('  失败 %s（%s）%s' % (path, st, (r or '')[:120]))
-    print('文件：成功 %d，失败 %d' % (ok, fail))
+    print('文件：新增/更新 %d，未变 %d，失败 %d' % (ok, skip, fail))
 
-    # 4. 创建 Release
-    st, rel = api(token, 'POST', '%s/repos/%s/%s/releases' % (GITHUB_API, owner, repo), {
-        'tag_name': VERSION,
-        'name': 'BiliLiveMonitor ' + VERSION,
-        'body': '完整介绍见仓库 README.md。\n\n- BiliLiveMonitor.exe：单文件，免 Python\n- BiliLiveMonitor-v1.0.0.zip：便携压缩包',
-        'draft': False,
-        'prerelease': False,
-    })
-    if st != 201:
-        print('创建 Release 失败（%s）：%s' % (st, rel))
-        sys.exit(1)
-    rel_id = rel['id']
-    print('Release：%s（id=%s）' % (VERSION, rel_id))
+    # 4. 创建/复用 Release
+    st, rel = api(token, 'GET', '%s/repos/%s/%s/releases/tags/%s' % (GITHUB_API, owner, repo, VERSION))
+    if st == 200 and isinstance(rel, dict):
+        rel_id = rel['id']
+        print('Release 已存在：%s（id=%s）' % (VERSION, rel_id))
+    else:
+        st, rel = api(token, 'POST', '%s/repos/%s/%s/releases' % (GITHUB_API, owner, repo), {
+            'tag_name': VERSION,
+            'name': 'BiliLiveMonitor ' + VERSION,
+            'body': '完整介绍见仓库 README.md。\n\n- BiliLiveMonitor.exe：单文件，免 Python\n- BiliLiveMonitor-v1.0.0.zip：便携压缩包',
+            'draft': False,
+            'prerelease': False,
+        })
+        if st != 201:
+            print('创建 Release 失败（%s）：%s' % (st, rel))
+            sys.exit(1)
+        rel_id = rel['id']
+        print('Release：%s（id=%s）' % (VERSION, rel_id))
 
-    # 5. 上传资产
+    # 5. 上传资产（已存在则跳过）
+    st, assets = api(token, 'GET', '%s/repos/%s/%s/releases/%s/assets' % (GITHUB_API, owner, repo, rel_id))
+    existing = {a['name'] for a in assets} if st == 200 and isinstance(assets, list) else set()
     for asset in RELEASE_ASSETS:
         if not os.path.exists(asset):
             print('  跳过缺失资产：%s' % asset)
             continue
         name = os.path.basename(asset)
+        if name in existing:
+            print('  资产已存在 %s' % name)
+            continue
         with open(asset, 'rb') as fh:
             data = fh.read()
         url = '%s/repos/%s/%s/releases/%s/assets' % (UPLOAD_API, owner, repo, rel_id)
