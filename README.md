@@ -112,13 +112,10 @@ python bili_monitor.py
 
 - **提示音**：开播时播放系统提示音；可自定义 `.wav` 文件。
 - **Bark 推送（iOS）**：
-  1. iPhone 安装 Bark。
-  2. 打开 Bark App，首页会显示推送地址。
-  3. 复制其中的 Device Key。
-  4. 在本应用「提醒方式 → Bark 推送」勾选「启用 Bark 推送」。
-  5. Server URL 默认 `https://api.day.app`；使用自建 bark-server 时填写自己的地址，例如 `https://bark.example.com`。
-  6. 填入 Device Key，保存配置，点击「测试通知」。
-  7. 收到开播提醒后点击 Bark 通知，可以直接打开对应 B 站直播间。
+  - iPhone 安装 Bark，打开 App 后在首页复制推送地址中的 Device Key。
+  - 在本应用「提醒方式 → Bark 推送」勾选「启用 Bark 推送」，填入 Device Key，保存后点击「测试通知」。
+  - Server URL 默认 `https://api.day.app`；使用自建 bark-server 时填写自己的地址，例如 `https://bark.example.com`。
+  - 收到开播提醒后点击 Bark 通知，可以直接打开对应 B 站直播间。
 - **微信推送**（离开电脑时用）：
   - **Server酱（方糖）**：登录 [sct.ftqq.com](https://sct.ftqq.com)，复制页面「SendKey」一栏以 `SCT` 开头的密钥。
   - **PushPlus**：登录 [www.pushplus.plus](https://www.pushplus.plus)，复制「一对一推送」页面的 32 位 `token`。
