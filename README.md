@@ -1,6 +1,6 @@
 # B站开播监控器 (BiliLiveMonitor)
 
-一款**完全本地化、免安装、低占用**的 Windows 桌面工具，用于实时监控一个或多个 B 站（哔哩哔哩）直播间，在主播开播时第一时间通过**桌面弹窗、提示音、微信推送、电话提醒**通知你。
+一款**完全本地化、免安装、低占用**的 Windows 桌面工具，用于实时监控一个或多个 B 站（哔哩哔哩）直播间，在主播开播时第一时间通过**桌面弹窗、提示音、Bark 推送、微信推送、电话提醒**通知你。
 
 > 纯本地应用：不依赖任何网页/服务器，数据只存在你自己的电脑上。无需 Python 环境即可运行（提供单文件 exe）。
 
@@ -23,6 +23,7 @@
 - 🔔 **多种通知方式**：
   - 桌面置顶弹窗（任何情况下都显示在最上层）
   - 提示音（支持自定义 `.wav`）
+  - Bark 推送：支持官方服务和自建 bark-server
   - 微信推送：Server酱 / PushPlus / WxPusher
   - 电话提醒：Twilio（付费，可选）
 - 🎨 **美化界面**：自定义背景图 + 背景模糊 + 磨砂效果。
@@ -110,6 +111,14 @@ python bili_monitor.py
 ### 4. 提醒方式
 
 - **提示音**：开播时播放系统提示音；可自定义 `.wav` 文件。
+- **Bark 推送（iOS）**：
+  1. iPhone 安装 Bark。
+  2. 打开 Bark App，首页会显示推送地址。
+  3. 复制其中的 Device Key。
+  4. 在本应用「提醒方式 → Bark 推送」勾选「启用 Bark 推送」。
+  5. Server URL 默认 `https://api.day.app`；使用自建 bark-server 时填写自己的地址，例如 `https://bark.example.com`。
+  6. 填入 Device Key，保存配置，点击「测试通知」。
+  7. 收到开播提醒后点击 Bark 通知，可以直接打开对应 B 站直播间。
 - **微信推送**（离开电脑时用）：
   - **Server酱（方糖）**：登录 [sct.ftqq.com](https://sct.ftqq.com)，复制页面「SendKey」一栏以 `SCT` 开头的密钥。
   - **PushPlus**：登录 [www.pushplus.plus](https://www.pushplus.plus)，复制「一对一推送」页面的 32 位 `token`。
@@ -173,6 +182,7 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed --name BiliLiveMo
 
 - **关闭窗口后程序还在运行？** 这是设计如此——关闭窗口会收进系统托盘继续监控，右键托盘图标可退出。
 - **微信收不到推送？** 请确认勾选了对应渠道、密钥/uid 填写正确，并查看「日志」标签页的推送结果。
+- **Bark 收不到通知？** 请确认已勾选「启用 Bark 推送」、Device Key 和 Server URL 填写正确、Bark App 已允许通知、iOS 已开启 Bark 通知权限，并查看日志中是否出现「Bark 推送成功」。若使用自建 Bark Server，请确认当前电脑能访问该地址。
 - **被 Windows 拦截 / 误报？** 见上方「Windows 安全拦截说明」。单文件 exe 由 PyInstaller 打包且未签名，属正常现象；源码公开可自行打包。
 - **技术说明**：基于 B 站公开接口查询开播状态，接口若调整可能需小幅更新（已内置单房间接口兜底）。
 

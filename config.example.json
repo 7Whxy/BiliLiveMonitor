@@ -19,6 +19,7 @@
     "serverChan": { "enabled": false, "sendKey": "" },
     "pushPlus": { "enabled": false, "token": "" },
     "wxPusher": { "enabled": false, "appToken": "", "uids": [] },
+    "bark": { "enabled": false, "server": "https://api.day.app", "deviceKey": "" },
     "phoneCall": { "enabled": false, "provider": "twilio", "accountSid": "", "authToken": "", "from": "", "to": "" }
   }
 }
